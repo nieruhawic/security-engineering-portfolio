@@ -1,0 +1,274 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="card">
+  <h3 style="margin-top:0;">Old Tenable Account Migration</h3>
+  <div class="muted">
+    Enter your old Tenable API keys to compare against your new account.
+    Credentials are <b>never saved</b> — they are used only for this session's comparison.
+    <br/>Results show which devices have already moved to the new account so you can remove them from the old one.
+  </div>
+</div>
+
+<!-- Credentials form -->
+<div class="card" id="credCard">
+  <div style="font-weight:600; margin-bottom:12px;">Old Tenable Credentials</div>
+  <div style="margin-bottom:10px;">
+    <label class="muted">Access Key</label><br/>
+    <input id="oldAccess" type="password" placeholder="Old Tenable Access Key" style="width:420px;" />
+  </div>
+  <div style="margin-bottom:10px;">
+    <label class="muted">Secret Key</label><br/>
+    <input id="oldSecret" type="password" placeholder="Old Tenable Secret Key" style="width:420px;" />
+  </div>
+  <div class="row" style="margin-top:12px;">
+    <button id="btnCompare">Compare Accounts</button>
+    <span id="compareStatus" class="muted" style="margin-left:12px;"></span>
+  </div>
+  <div class="muted" style="margin-top:10px; font-size:12px;">
+    Base URL: <code>https://cloud.tenable.com</code> — same for both accounts.
+    Requires your new account local DB to be synced first.
+  </div>
+</div>
+
+<!-- Summary pills — hidden until compare runs -->
+<div class="card" id="summaryCard" style="display:none;">
+  <div style="font-weight:600; margin-bottom:10px;">Comparison Summary</div>
+  <div class="row" style="flex-wrap:wrap; gap:8px;">
+    <span class="pill">Old account total: <b id="sumOldTotal">—</b></span>
+    <span class="pill">New account total: <b id="sumNewTotal">—</b></span>
+    <span class="pill" style="border-color:rgba(255,180,0,0.5); color:rgba(255,200,80,0.9);">In both: <b id="sumBoth">—</b></span>
+    <span class="pill" style="border-color:rgba(255,80,80,0.4); color:rgba(255,140,140,0.9);">Old only (not migrated): <b id="sumOldOnly">—</b></span>
+    <span class="pill" style="border-color:rgba(80,200,80,0.4); color:rgba(140,220,140,0.9);">New only (fully migrated): <b id="sumNewOnly">—</b></span>
+  </div>
+</div>
+
+<!-- In Both table — the ones to clean up -->
+<div class="card" id="inBothCard" style="display:none;">
+  <div class="row" style="justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+    <div>
+      <div style="font-weight:600;">In Both Accounts <span id="inBothCount" style="font-weight:400; color:var(--muted);"></span></div>
+      <div class="muted" style="margin-top:4px; font-size:12px;">
+        These devices exist in both old and new Tenable. Safe to delete from the old account.
+      </div>
+    </div>
+    <div class="row" style="gap:8px;">
+      <button id="btnSelectAll" style="font-size:12px; padding:5px 10px;">Select All</button>
+      <button id="btnSelectNone" style="font-size:12px; padding:5px 10px;">Select None</button>
+      <button id="btnDeleteSelected"
+        style="font-size:12px; padding:5px 10px; border-color:rgba(255,80,80,0.4); color:rgba(255,140,140,0.9);"
+        disabled>
+        Delete Selected from Old Account
+      </button>
+    </div>
+  </div>
+
+  <div id="deleteStatus" class="muted" style="margin-bottom:10px; display:none;"></div>
+
+  <table id="inBothTable">
+    <thead>
+      <tr>
+        <th style="width:36px;"><input type="checkbox" id="chkAll" /></th>
+        <th>Hostname</th>
+        <th>Old Account ID</th>
+        <th>New Account ID</th>
+        <th>Tags (old)</th>
+      </tr>
+    </thead>
+    <tbody id="inBothBody"></tbody>
+  </table>
+</div>
+
+<!-- Old Only table -->
+<div class="card" id="oldOnlyCard" style="display:none;">
+  <div style="font-weight:600; margin-bottom:6px;">Old Account Only <span id="oldOnlyCount" style="font-weight:400; color:var(--muted);"></span></div>
+  <div class="muted" style="margin-bottom:10px; font-size:12px;">
+    These devices are still in the old account but haven't appeared in the new account yet. Do not delete.
+  </div>
+  <table id="oldOnlyTable">
+    <thead>
+      <tr>
+        <th>Hostname</th>
+        <th>Old Account ID</th>
+        <th>Tags (old)</th>
+      </tr>
+    </thead>
+    <tbody id="oldOnlyBody"></tbody>
+  </table>
+</div>
+
+<script>
+  // Keep credentials in memory only — never written anywhere
+  let _oldAccess = "";
+  let _oldSecret = "";
+  let _inBothData = [];
+
+  const compareBtn    = document.getElementById("btnCompare");
+  const compareStatus = document.getElementById("compareStatus");
+
+  compareBtn.addEventListener("click", async () => {
+    _oldAccess = document.getElementById("oldAccess").value.trim();
+    _oldSecret = document.getElementById("oldSecret").value.trim();
+
+    if (!_oldAccess || !_oldSecret) {
+      compareStatus.textContent = "Please enter both Access Key and Secret Key.";
+      return;
+    }
+
+    compareBtn.disabled = true;
+    compareStatus.textContent = "Fetching assets from old account… this may take a minute.";
+
+    // Hide previous results
+    ["summaryCard","inBothCard","oldOnlyCard"].forEach(id => {
+      document.getElementById(id).style.display = "none";
+    });
+
+    try {
+      const body = new FormData();
+      body.append("old_access", _oldAccess);
+      body.append("old_secret", _oldSecret);
+
+      const res  = await fetch("/api/migration/compare", { method: "POST", body });
+      const data = await res.json();
+
+      if (!data.ok) {
+        compareStatus.textContent = "Error: " + (data.error || "unknown");
+        return;
+      }
+
+      compareStatus.textContent = "Done.";
+      _inBothData = data.in_both || [];
+
+      // Summary
+      document.getElementById("sumOldTotal").textContent = data.old_total;
+      document.getElementById("sumNewTotal").textContent = data.new_total;
+      document.getElementById("sumBoth").textContent     = data.summary.in_both_count;
+      document.getElementById("sumOldOnly").textContent  = data.summary.old_only_count;
+      document.getElementById("sumNewOnly").textContent  = data.summary.new_only_count;
+      document.getElementById("summaryCard").style.display = "block";
+
+      // In Both table
+      buildInBothTable(_inBothData);
+
+      // Old Only table
+      buildOldOnlyTable(data.old_only || []);
+
+    } catch (e) {
+      compareStatus.textContent = "Request failed: " + e;
+    } finally {
+      compareBtn.disabled = false;
+    }
+  });
+
+  function buildInBothTable(rows) {
+    const tbody = document.getElementById("inBothBody");
+    tbody.innerHTML = "";
+    document.getElementById("inBothCount").textContent = `(${rows.length})`;
+
+    rows.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input type="checkbox" class="rowChk" data-id="${r.id}" /></td>
+        <td>${r.hostname || "—"}</td>
+        <td><code style="font-size:11px;">${r.id}</code></td>
+        <td><code style="font-size:11px;">${r.new_id || "—"}</code></td>
+        <td class="muted" style="font-size:11px;">${(r.tags || []).join(", ") || "—"}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById("inBothCard").style.display = rows.length ? "block" : "none";
+    updateDeleteBtn();
+  }
+
+  function buildOldOnlyTable(rows) {
+    const tbody = document.getElementById("oldOnlyBody");
+    tbody.innerHTML = "";
+    document.getElementById("oldOnlyCount").textContent = `(${rows.length})`;
+    rows.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.hostname || "—"}</td>
+        <td><code style="font-size:11px;">${r.id}</code></td>
+        <td class="muted" style="font-size:11px;">${(r.tags || []).join(", ") || "—"}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    document.getElementById("oldOnlyCard").style.display = rows.length ? "block" : "none";
+  }
+
+  // Select all / none
+  document.getElementById("btnSelectAll").addEventListener("click", () => {
+    document.querySelectorAll(".rowChk").forEach(c => c.checked = true);
+    document.getElementById("chkAll").checked = true;
+    updateDeleteBtn();
+  });
+  document.getElementById("btnSelectNone").addEventListener("click", () => {
+    document.querySelectorAll(".rowChk").forEach(c => c.checked = false);
+    document.getElementById("chkAll").checked = false;
+    updateDeleteBtn();
+  });
+  document.getElementById("chkAll").addEventListener("change", function() {
+    document.querySelectorAll(".rowChk").forEach(c => c.checked = this.checked);
+    updateDeleteBtn();
+  });
+  document.getElementById("inBothBody").addEventListener("change", updateDeleteBtn);
+
+  function updateDeleteBtn() {
+    const count = document.querySelectorAll(".rowChk:checked").length;
+    const btn = document.getElementById("btnDeleteSelected");
+    btn.disabled = count === 0;
+    btn.textContent = count > 0
+      ? `Delete ${count} Selected from Old Account`
+      : "Delete Selected from Old Account";
+  }
+
+  // Delete selected
+  document.getElementById("btnDeleteSelected").addEventListener("click", async () => {
+    const checked = [...document.querySelectorAll(".rowChk:checked")];
+    const uuids   = checked.map(c => c.dataset.id).filter(Boolean);
+
+    if (!uuids.length) return;
+
+    const ok = confirm(`Delete ${uuids.length} asset(s) from the OLD Tenable account?\n\nThis cannot be undone.`);
+    if (!ok) return;
+
+    const deleteBtn    = document.getElementById("btnDeleteSelected");
+    const deleteStatus = document.getElementById("deleteStatus");
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = "Deleting...";
+    deleteStatus.style.display = "block";
+    deleteStatus.textContent = `Submitting delete for ${uuids.length} assets...`;
+
+    try {
+      const res  = await fetch("/api/migration/delete-from-old", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          old_access:  _oldAccess,
+          old_secret:  _oldSecret,
+          asset_uuids: uuids,
+        }),
+      });
+      const data = await res.json();
+
+      if (data.ok) {
+        deleteStatus.textContent = `Done. Deleted: ${data.deleted}, Errors: ${data.errors}.`;
+        // Remove deleted rows from table
+        checked.forEach(c => c.closest("tr").remove());
+        const remaining = document.querySelectorAll(".rowChk").length;
+        document.getElementById("inBothCount").textContent = `(${remaining})`;
+        updateDeleteBtn();
+      } else {
+        deleteStatus.textContent = "Delete failed: " + (data.error || "unknown");
+      }
+    } catch (e) {
+      deleteStatus.textContent = "Request failed: " + e;
+    } finally {
+      deleteBtn.disabled = false;
+      updateDeleteBtn();
+    }
+  });
+</script>
+
+{% endblock %}

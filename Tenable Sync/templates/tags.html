@@ -1,0 +1,276 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="card">
+  <h3 style="margin-top:0;">Tenable Tag &amp; Group Tools</h3>
+
+  <div class="muted" style="margin-bottom:12px;">
+    Run individual operations or use <strong>Run All</strong> to execute all steps in order.
+    Hostname matching uses <code>lower(hostname)[0:15]</code>.
+  </div>
+
+  <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+    <span class="pill">Tenable keys: {{ "Yes" if tenable_has_keys else "No" }}</span>
+    <span class="pill">JumpCloud cached: {{ "Yes" if jc_cached else "No" }}</span>
+    <span class="pill">Base URL: <code>{{ base_url }}</code></span>
+    {% if tenable_last_sync and tenable_last_sync.finished_at %}
+      <span class="pill">Tenable synced: <b id="tagTenableAge" data-ts="{{ tenable_last_sync.finished_at }}">{{ tenable_last_sync.finished_at }}</b></span>
+    {% else %}
+      <span class="pill" style="color:rgba(255,100,100,0.8);">Tenable: never synced</span>
+    {% endif %}
+    {% if jc_last_sync and jc_last_sync.finished_at %}
+      <span class="pill">JumpCloud synced: <b id="tagJcAge" data-ts="{{ jc_last_sync.finished_at }}">{{ jc_last_sync.finished_at }}</b></span>
+    {% else %}
+      <span class="pill" style="color:rgba(255,100,100,0.8);">JumpCloud: never synced</span>
+    {% endif %}
+  </div>
+
+  {% if tenable_cache_stale or jc_cache_stale %}
+  <div style="margin-top:12px; padding:10px 14px; border-radius:10px; border:1px solid rgba(255,80,80,0.4); background:rgba(255,40,40,0.07); font-size:13px; color:rgba(255,140,140,0.95);">
+    ⚠️ <b>Stale cache warning</b> —
+    {% if tenable_cache_stale and jc_cache_stale %}
+      Both Tenable and JumpCloud caches are over 24 hours old (or have never been synced).
+    {% elif tenable_cache_stale %}
+      Tenable cache is over 24 hours old (or has never been synced).
+    {% else %}
+      JumpCloud cache is over 24 hours old (or has never been synced).
+    {% endif %}
+    Go to <a href="/">Home</a> and run a sync before tagging.
+  </div>
+  {% endif %}
+
+  <!-- Run All card -->
+  <div class="card" style="background: var(--panel2); border: 1px solid rgba(255,122,24,0.35);">
+    <div class="row" style="justify-content:space-between; align-items:flex-start;">
+      <div>
+        <div style="font-weight:700; font-size:15px;">&#9654; Run All</div>
+        <div class="muted" style="margin-top:6px;">
+          Runs all three steps in sequence:
+          <code>Org tags</code> → <code>Department + OS tags</code> → <code>Assign Agent Groups</code>.
+        </div>
+      </div>
+      <button id="btnRunAll" {% if not tenable_has_keys %}disabled{% endif %} style="white-space:nowrap;">
+        Run All
+      </button>
+    </div>
+    <div id="runAllProgress" style="display:none; margin-top:12px;">
+      <div id="runAllSteps" style="font-size:12.5px; line-height:2;"></div>
+    </div>
+    <div class="muted" style="margin-top:10px; font-size:12px;">
+      Requires: Tenable keys + JumpCloud sync already run.
+    </div>
+  </div>
+
+  <!-- Step 1: Org tags -->
+  <div class="card" style="background: var(--panel2); margin-top:12px;">
+    <div class="row" style="justify-content:space-between;">
+      <div>
+        <div style="font-weight:600;">1 — Org tags</div>
+        <div class="muted" style="margin-top:6px;">
+          Adds <code>Org:Beyond</code> and <code>Org:FiveLakes</code> based on JumpCloud hostname matches.
+          Devices found in both JumpCloud accounts are tagged <code>Org:Both Accounts</code> — likely mid-migration.
+          Once the migration is complete, re-run Org tags and they will be corrected automatically.
+        </div>
+      </div>
+      <button id="btnTagOrg" {% if not tenable_has_keys %}disabled{% endif %}>
+        Tag Org
+      </button>
+    </div>
+    <div class="muted" style="margin-top:10px; font-size:12px;">
+      Requires: Tenable keys + JumpCloud sync already run.
+    </div>
+  </div>
+
+  <!-- Step 2: Department + OS tags -->
+  <div class="card" style="background: var(--panel2); margin-top:12px;">
+    <div class="row" style="justify-content:space-between;">
+      <div>
+        <div style="font-weight:600;">2 — Department + OS tags</div>
+        <div class="muted" style="margin-top:6px;">
+          Tags all assets with <code>OS:Mac</code> or <code>OS:Windows</code>.
+          Tags Windows assets with <code>Department:CSD / Sales / SET / Workspace / Corp</code> based on agent name.
+          Macs receive OS tag only.
+        </div>
+      </div>
+      <button id="btnTagDept" {% if not tenable_has_keys %}disabled{% endif %}>
+        Tag Department + OS
+      </button>
+    </div>
+    <div class="muted" style="margin-top:10px; font-size:12px;">
+      Requires: Tenable keys only.
+    </div>
+  </div>
+
+  <!-- Weekly audit separator -->
+  <div style="margin-top:20px; margin-bottom:4px; font-size:11px; font-weight:700; letter-spacing:0.8px; color:rgba(255,255,255,0.35); text-transform:uppercase;">
+    Weekly Audit
+  </div>
+
+  <!-- Device:Not in JC -->
+  <div class="card" style="background: var(--panel2); margin-top:4px; border: 1px solid rgba(255,255,255,0.08);">
+    <div class="row" style="justify-content:space-between;">
+      <div>
+        <div style="font-weight:600;">Device:Not in JC <span style="font-weight:400; font-size:11px; color:rgba(255,255,255,0.45); margin-left:6px;">weekly audit</span></div>
+        <div class="muted" style="margin-top:6px;">
+          Tags all Tenable assets that have no matching JumpCloud device with <code>Device:Not in JC</code>.
+          Uses the same hostname matching as the Diff page.
+        </div>
+      </div>
+      <button id="btnTagNotInJc" {% if not tenable_has_keys %}disabled{% endif %}>
+        Tag Device:Not in JC
+      </button>
+    </div>
+    <div class="muted" style="margin-top:10px; font-size:12px;">
+      Requires: Tenable keys + JumpCloud sync already run.
+    </div>
+  </div>
+
+  <!-- Step 4: Agent group assignment -->
+  <div class="card" style="background: var(--panel2); margin-top:12px;">
+    <div class="row" style="justify-content:space-between;">
+      <div>
+        <div style="font-weight:600;">3 — Assign Agent Groups</div>
+        <div class="muted" style="margin-top:6px;">
+          Assigns agents to groups based on <code>OS:*</code> and <code>Department:*</code> tags.
+          Macs → <code>Mac</code>. Windows → <code>CSD / Sales / SET / WorkSpaces / Corp</code>
+          or <code>Windows Workstations</code>. Specific-group devices are removed from catch-all groups automatically.
+        </div>
+      </div>
+      <button id="btnAssignGroups" {% if not tenable_has_keys %}disabled{% endif %}>
+        Assign Agent Groups
+      </button>
+    </div>
+    <div class="muted" style="margin-top:10px; font-size:12px;">
+      Requires: Tenable keys + steps 1–3 already run (tags must be applied first).
+    </div>
+  </div>
+
+  <!-- Shared result card -->
+  <div class="card" id="resultCard" style="display:none; margin-top:12px;">
+    <div style="font-weight:600; margin-bottom:8px;" id="resultTitle">Result</div>
+    <pre id="resultText" style="white-space:pre-wrap; margin:0; font-size:12px;"></pre>
+  </div>
+</div>
+
+<script>
+  const resultCard = document.getElementById("resultCard");
+  const resultTxt  = document.getElementById("resultText");
+  const resultTitle = document.getElementById("resultTitle");
+
+  function showResult(title, data) {
+    resultTitle.textContent = title;
+    resultCard.style.display = "block";
+    resultTxt.textContent = JSON.stringify(data, null, 2);
+    resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  async function runTag(btnId, endpoint, label) {
+    const btn = document.getElementById(btnId);
+    const origText = btn.textContent.trim();
+    btn.disabled = true;
+    btn.textContent = "Running...";
+    resultCard.style.display = "block";
+    resultTitle.textContent = label + " — running...";
+    resultTxt.textContent = "Working...";
+    resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    try {
+      const r = await fetch(endpoint, { method: "POST" });
+      const data = await r.json();
+      showResult(label + (data.ok ? " — done" : " — failed"), data);
+      return data;
+    } catch (e) {
+      const err = { ok: false, error: String(e) };
+      showResult(label + " — error", err);
+      return err;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
+  }
+
+  const STEPS = [
+    { btnId: "btnTagOrg",        endpoint: "/api/tenable/tag-org",        label: "1 — Org tags" },
+    { btnId: "btnTagDept",       endpoint: "/api/tenable/tag-department",  label: "2 — Department + OS tags" },
+    { btnId: "btnAssignGroups",  endpoint: "/api/tenable/assign-groups",   label: "3 — Assign Agent Groups" },
+  ];
+
+  // Relative timestamps
+  function timeAgo(isoStr) {
+    if (!isoStr) return null;
+    // Normalize +00:00 / +HH:MM offset to Z so all browsers parse correctly
+    const normalized = isoStr.replace(/\+\d{2}:\d{2}$/, "Z").replace(/Z+$/, "Z");
+    const then = new Date(normalized);
+    if (isNaN(then)) return isoStr;
+    const diff = Math.floor((Date.now() - then) / 1000);
+    if (diff < 60)    return diff + "s ago";
+    if (diff < 3600)  return Math.floor(diff / 60) + "m ago";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+    return Math.floor(diff / 86400) + "d ago";
+  }
+  function updateAges() {
+    ["tagTenableAge", "tagJcAge"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const ago = timeAgo(el.dataset.ts);
+      if (ago) el.textContent = ago;
+    });
+  }
+  updateAges();
+  setInterval(updateAges, 30000);
+
+  // Wire individual buttons
+  STEPS.forEach(s => {
+    const btn = document.getElementById(s.btnId);
+    if (btn) btn.addEventListener("click", () => runTag(s.btnId, s.endpoint, s.label));
+  });
+
+  // Run All
+  document.getElementById("btnRunAll").addEventListener("click", async () => {
+    const runAllBtn = document.getElementById("btnRunAll");
+    const progressDiv = document.getElementById("runAllProgress");
+    const stepsDiv = document.getElementById("runAllSteps");
+
+    runAllBtn.disabled = true;
+    runAllBtn.textContent = "Running...";
+    progressDiv.style.display = "block";
+    stepsDiv.innerHTML = "";
+    resultCard.style.display = "none";
+
+    const allResults = {};
+
+    for (const step of STEPS) {
+      // Mark step as running
+      const stepEl = document.createElement("div");
+      stepEl.id = "step-" + step.btnId;
+      stepEl.textContent = "⏳ " + step.label + "...";
+      stepsDiv.appendChild(stepEl);
+      stepsDiv.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+      // Disable the individual button too
+      const indBtn = document.getElementById(step.btnId);
+      if (indBtn) indBtn.disabled = true;
+
+      try {
+        const r = await fetch(step.endpoint, { method: "POST" });
+        const data = await r.json();
+        allResults[step.label] = data;
+        stepEl.textContent = (data.ok ? "✅ " : "❌ ") + step.label + (data.ok ? " — done" : " — failed: " + (data.error || "unknown"));
+      } catch (e) {
+        allResults[step.label] = { ok: false, error: String(e) };
+        stepEl.textContent = "❌ " + step.label + " — error: " + String(e);
+      }
+
+      // Re-enable individual button
+      if (indBtn) indBtn.disabled = false;
+    }
+
+    runAllBtn.disabled = false;
+    runAllBtn.textContent = "Run All";
+
+    // Show combined result
+    showResult("Run All — complete", allResults);
+  });
+</script>
+
+{% endblock %}

@@ -1,0 +1,367 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<!-- ===================== -->
+<!-- Tenable -->
+<!-- ===================== -->
+<div class="card">
+  <div class="row">
+    <div>
+      <div><b>Base URL:</b> <code>{{ base_url }}</code></div>
+      <div class="muted">
+        Keys configured: <b>{{ "Yes" if has_keys else "No" }}</b> —
+        Cached assets in DB: <b>{{ assets_count }}</b>
+      </div>
+      {% if tenable_last_sync and tenable_last_sync.finished_at %}
+        <div class="muted" style="margin-top:4px;">
+          Last synced: <b id="tenableSyncAge" data-ts="{{ tenable_last_sync.finished_at }}">{{ tenable_last_sync.finished_at }}</b>
+          {% if tenable_last_sync.detail %}
+            — <span style="font-size:12px;">{{ tenable_last_sync.detail }}</span>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="muted" style="margin-top:4px;">Last synced: <b>Never</b></div>
+      {% endif %}
+      {% if tenable_cache_stale %}
+        <div style="margin-top:4px; font-size:12px; color:rgba(255,140,140,0.9);">⚠️ Cache is stale — sync before tagging</div>
+      {% endif %}
+    </div>
+    <span style="flex:1;"></span>
+
+    <div class="row">
+      <label class="muted">Show</label>
+      <select id="perPageSel" style="width:auto;">
+        {% for n in [10,50,100,200,500] %}
+          <option value="{{ n }}" {% if n == per_page %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+      <span class="muted">per page</span>
+    </div>
+
+    <button id="syncBtn" {% if not has_keys %}disabled{% endif %}>Sync from Tenable</button>
+    <button id="clearTenableBtn" style="border-color:rgba(255,80,80,0.4); color:rgba(255,140,140,0.9);">Clear Tenable DB</button>
+  </div>
+
+  <div id="syncStatus" class="muted" style="margin-top:10px;"></div>
+</div>
+
+<div class="card">
+  <div class="row">
+    <b>Tenable Assets</b>
+    <span class="pill">Page {{ page }} of {{ total_pages }}</span>
+    <input id="tenableFilter" type="text" placeholder="Filter by hostname, OS, tag…"
+      style="width:220px; padding:5px 10px; font-size:12px;" />
+    <span id="tenableFilterCount" class="muted" style="font-size:12px;"></span>
+    <span style="flex:1;"></span>
+    <div class="pager">
+      {% if page > 1 %}
+        <a href="/?page=1&per_page={{ per_page }}&jc_page={{ jc_page }}&jc_per_page={{ jc_per_page }}">First</a>
+        <a href="/?page={{ page-1 }}&per_page={{ per_page }}&jc_page={{ jc_page }}&jc_per_page={{ jc_per_page }}">Prev</a>
+      {% else %}
+        <span>First</span><span>Prev</span>
+      {% endif %}
+
+      {% if page < total_pages %}
+        <a href="/?page={{ page+1 }}&per_page={{ per_page }}&jc_page={{ jc_page }}&jc_per_page={{ jc_per_page }}">Next</a>
+        <a href="/?page={{ total_pages }}&per_page={{ per_page }}&jc_page={{ jc_page }}&jc_per_page={{ jc_per_page }}">Last</a>
+      {% else %}
+        <span>Next</span><span>Last</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <table id="tenableTable">
+    <thead>
+      <tr>
+        <th style="width: 290px;">ID</th>
+        <th>Hostname</th>
+        <th>OS</th>
+        <th style="width: 240px;">Last Seen</th>
+        <th>Tags</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in assets %}
+      <tr>
+        <td><code>{{ a.id }}</code></td>
+        <td>{{ a.hostname }}</td>
+        <td>{{ a.os }}</td>
+        <td>{{ a.last_seen }}</td>
+        <td class="muted">{{ a.tags }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ===================== -->
+<!-- JumpCloud -->
+<!-- ===================== -->
+<div class="card">
+  <div class="row">
+    <div>
+      <b>JumpCloud Systems</b>
+      <div class="muted" style="margin-top:4px;">
+        {{ jc1_label }} configured: <b>{{ "Yes" if jc1_configured else "No" }}</b> —
+        {{ jc2_label }} configured: <b>{{ "Yes" if jc2_configured else "No" }}</b>
+      </div>
+      <div class="muted" style="margin-top:4px;">
+        Total cached: <b>{{ jc_total_count }}</b> —
+        {{ jc1_label }}: <b>{{ jc1_count }}</b> —
+        {{ jc2_label }}: <b>{{ jc2_count }}</b>
+      </div>
+      {% if jc_last_sync and jc_last_sync.finished_at %}
+        <div class="muted" style="margin-top:4px;">
+          Last synced: <b id="jcSyncAge" data-ts="{{ jc_last_sync.finished_at }}">{{ jc_last_sync.finished_at }}</b>
+          {% if jc_last_sync.detail %}
+            — <span style="font-size:12px;">{{ jc_last_sync.detail }}</span>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="muted" style="margin-top:4px;">Last synced: <b>Never</b></div>
+      {% endif %}
+      {% if jc_cache_stale %}
+        <div style="margin-top:4px; font-size:12px; color:rgba(255,140,140,0.9);">⚠️ Cache is stale — sync before tagging</div>
+      {% endif %}
+    </div>
+
+    <span style="flex:1;"></span>
+
+    <div class="row">
+      <label class="muted">Show</label>
+      <select id="jcPerPageSel" style="width:auto;">
+        {% for n in [10,50,100,200,500] %}
+          <option value="{{ n }}" {% if n == jc_per_page %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+      <span class="muted">per page</span>
+    </div>
+
+    <button id="jcSyncBtn" {% if not (jc1_configured or jc2_configured) %}disabled{% endif %}>Sync from JumpCloud</button>
+    <button id="clearJcBtn" style="border-color:rgba(255,80,80,0.4); color:rgba(255,140,140,0.9);">Clear JumpCloud DB</button>
+  </div>
+
+  <div id="jcSyncStatus" class="muted" style="margin-top:10px;"></div>
+
+  <div class="row" style="margin-top:10px; flex-wrap:wrap;">
+    <span class="pill">Page {{ jc_page }} of {{ jc_total_pages }}</span>
+    <form method="get" action="/" style="display:flex; gap:6px; align-items:center; margin:0;">
+      <input type="hidden" name="page" value="{{ page }}" />
+      <input type="hidden" name="per_page" value="{{ per_page }}" />
+      <input type="hidden" name="jc_per_page" value="{{ jc_per_page }}" />
+      <input name="jc_search" type="text" value="{{ jc_search }}"
+        placeholder="Search all JumpCloud devices…"
+        style="width:240px; padding:5px 10px; font-size:12px;" />
+      <button type="submit" style="padding:5px 10px; font-size:12px;">Search</button>
+      {% if jc_search %}
+        <a href="/?page={{ page }}&per_page={{ per_page }}&jc_per_page={{ jc_per_page }}"
+          style="font-size:12px; padding:5px 8px;">✕ Clear</a>
+      {% endif %}
+    </form>
+    {% if jc_search %}
+      <span class="muted" style="font-size:12px;">Showing results for <b>{{ jc_search }}</b> — searches full database</span>
+    {% endif %}
+    <span style="flex:1;"></span>
+    <div class="pager">
+      {% if jc_page > 1 %}
+        <a href="/?page={{ page }}&per_page={{ per_page }}&jc_page=1&jc_per_page={{ jc_per_page }}">First</a>
+        <a href="/?page={{ page }}&per_page={{ per_page }}&jc_page={{ jc_page-1 }}&jc_per_page={{ jc_per_page }}">Prev</a>
+      {% else %}
+        <span>First</span><span>Prev</span>
+      {% endif %}
+
+      {% if jc_page < jc_total_pages %}
+        <a href="/?page={{ page }}&per_page={{ per_page }}&jc_page={{ jc_page+1 }}&jc_per_page={{ jc_per_page }}">Next</a>
+        <a href="/?page={{ page }}&per_page={{ per_page }}&jc_page={{ jc_total_pages }}&jc_per_page={{ jc_per_page }}">Last</a>
+      {% else %}
+        <span>Next</span><span>Last</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <table id="jcTable" style="margin-top:10px;">
+    <thead>
+      <tr>
+        <th style="width:120px;">Account</th>
+        <th style="width: 240px;">ID</th>
+        <th>Hostname</th>
+        <th>OS</th>
+        <th style="width: 240px;">Last Seen</th>
+        <th>Tags</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in jc_systems %}
+      <tr>
+        <td><code>{{ s._label }}</code></td>
+        <td><code>{{ s.id }}</code></td>
+        <td>{{ s.hostname }}</td>
+        <td>{{ s.os }}</td>
+        <td>{{ s.last_seen }}</td>
+        <td class="muted">{{ s.tags }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  // Convert UTC ISO timestamp to "X minutes/hours/days ago"
+  function timeAgo(isoStr) {
+    if (!isoStr) return null;
+    // Normalize: replace +00:00 / +HH:MM suffix with Z so all browsers parse it
+    const normalized = isoStr.replace(/\+\d{2}:\d{2}$/, "Z").replace(/Z+$/, "Z");
+    const then = new Date(normalized);
+    if (isNaN(then)) return isoStr;
+    const diff = Math.floor((Date.now() - then) / 1000);
+    if (diff < 60)    return diff + "s ago";
+    if (diff < 3600)  return Math.floor(diff / 60) + "m ago";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+    return Math.floor(diff / 86400) + "d ago";
+  }
+
+  function updateAges() {
+    ["tenableSyncAge", "jcSyncAge"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const ts = el.dataset.ts;
+      const ago = timeAgo(ts);
+      if (ago) el.textContent = ago;
+    });
+  }
+  updateAges();
+  setInterval(updateAges, 30000);
+
+  // Tenable per-page selector
+  const perSel = document.getElementById("perPageSel");
+  perSel.addEventListener("change", () => {
+    window.location.href = `/?page=1&per_page=${perSel.value}&jc_page={{ jc_page }}&jc_per_page={{ jc_per_page }}`;
+  });
+
+  // JumpCloud per-page selector
+  const jcPerSel = document.getElementById("jcPerPageSel");
+  jcPerSel.addEventListener("change", () => {
+    window.location.href = `/?page={{ page }}&per_page={{ per_page }}&jc_page=1&jc_per_page=${jcPerSel.value}`;
+  });
+
+  // Tenable sync
+  const btn = document.getElementById("syncBtn");
+  const status = document.getElementById("syncStatus");
+  if (btn) {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      status.textContent = "Tenable sync started…";
+      try {
+        const res = await fetch("/sync", { method: "POST" });
+        const data = await res.json();
+        if (!data.ok) status.textContent = "Tenable sync failed: " + (data.error || "unknown error");
+        else {
+          status.textContent = `Tenable sync complete. Upserted ${data.upserted}. Refreshing…`;
+          setTimeout(() => window.location.reload(), 800);
+        }
+      } catch (e) {
+        status.textContent = "Tenable sync failed: " + e;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
+  // JumpCloud sync
+  const jcBtn = document.getElementById("jcSyncBtn");
+  const jcStatus = document.getElementById("jcSyncStatus");
+  if (jcBtn) {
+    jcBtn.addEventListener("click", async () => {
+      jcBtn.disabled = true;
+      jcStatus.textContent = "JumpCloud sync started…";
+      try {
+        const res = await fetch("/sync/jumpcloud", { method: "POST" });
+        const data = await res.json();
+        if (!data.ok) jcStatus.textContent = "JumpCloud sync failed: " + (data.error || "unknown error");
+        else {
+          jcStatus.textContent = `JumpCloud sync complete. Upserted ${data.upserted} (${data.detail}). Refreshing…`;
+          setTimeout(() => window.location.reload(), 800);
+        }
+      } catch (e) {
+        jcStatus.textContent = "JumpCloud sync failed: " + e;
+      } finally {
+        jcBtn.disabled = false;
+      }
+    });
+  }
+  // Clear Tenable DB
+  const clearTenableBtn = document.getElementById("clearTenableBtn");
+  if (clearTenableBtn) {
+    clearTenableBtn.addEventListener("click", async () => {
+      if (!confirm("Clear all Tenable assets and sync history from the local database?\n\nThis cannot be undone. You will need to run a full sync to repopulate.")) return;
+      clearTenableBtn.disabled = true;
+      clearTenableBtn.textContent = "Clearing...";
+      status.textContent = "Clearing Tenable data...";
+      try {
+        const res = await fetch("/api/db/clear-tenable", { method: "POST" });
+        const data = await res.json();
+        if (data.ok) {
+          status.textContent = "Tenable database cleared. Refreshing...";
+          setTimeout(() => window.location.reload(), 800);
+        } else {
+          status.textContent = "Clear failed: " + (data.error || "unknown error");
+          clearTenableBtn.disabled = false;
+          clearTenableBtn.textContent = "Clear Tenable DB";
+        }
+      } catch (e) {
+        status.textContent = "Clear failed: " + e;
+        clearTenableBtn.disabled = false;
+        clearTenableBtn.textContent = "Clear Tenable DB";
+      }
+    });
+  }
+
+  // Clear JumpCloud DB
+  const clearJcBtn = document.getElementById("clearJcBtn");
+  if (clearJcBtn) {
+    clearJcBtn.addEventListener("click", async () => {
+      if (!confirm("Clear all JumpCloud systems and sync history from the local database?\n\nThis cannot be undone. You will need to run a full sync to repopulate.")) return;
+      clearJcBtn.disabled = true;
+      clearJcBtn.textContent = "Clearing...";
+      jcStatus.textContent = "Clearing JumpCloud data...";
+      try {
+        const res = await fetch("/api/db/clear-jumpcloud", { method: "POST" });
+        const data = await res.json();
+        if (data.ok) {
+          jcStatus.textContent = "JumpCloud database cleared. Refreshing...";
+          setTimeout(() => window.location.reload(), 800);
+        } else {
+          jcStatus.textContent = "Clear failed: " + (data.error || "unknown error");
+          clearJcBtn.disabled = false;
+          clearJcBtn.textContent = "Clear JumpCloud DB";
+        }
+      } catch (e) {
+        jcStatus.textContent = "Clear failed: " + e;
+        clearJcBtn.disabled = false;
+        clearJcBtn.textContent = "Clear JumpCloud DB";
+      }
+    });
+  }
+
+  // Table filter
+  function setupFilter(inputId, tableSelector, countId) {
+    const input = document.getElementById(inputId);
+    const countEl = document.getElementById(countId);
+    if (!input) return;
+    input.addEventListener("input", () => {
+      const q = input.value.trim().toLowerCase();
+      const rows = document.querySelectorAll(tableSelector + " tbody tr");
+      let visible = 0;
+      rows.forEach(row => {
+        const match = !q || row.textContent.toLowerCase().includes(q);
+        row.style.display = match ? "" : "none";
+        if (match) visible++;
+      });
+      if (countEl) countEl.textContent = q ? `${visible} of ${rows.length} shown` : "";
+    });
+  }
+  setupFilter("tenableFilter", "#tenableTable", "tenableFilterCount");
+
+</script>
+
+{% endblock %}

@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TSync</title>
+  <style>
+    :root{
+      --bg:#0b0b0d;
+      --panel:#111217;
+      --panel2:#0e0f14;
+      --border:#262833;
+      --text:#ff8c00;
+      --muted:#d9a35f;
+      --link:#ff9f1a;
+      --inputbg:#0a0a0c;
+    }
+    body { font-family: Arial, sans-serif; margin: 24px; background: var(--bg); color: var(--text); }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .row { display:flex; gap: 12px; align-items:center; flex-wrap:wrap; }
+    .card { background: var(--panel); border: 1px solid var(--border); padding: 16px; border-radius: 12px; margin-top: 16px; }
+    .muted { color: var(--muted); font-size: 13px; }
+
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid var(--border); padding: 8px; text-align:left; font-size: 13px; }
+    th { color: var(--muted); font-weight: 600; }
+    code { background: var(--panel2); border: 1px solid var(--border); padding:2px 6px; border-radius: 8px; color: var(--text); }
+
+    input, select {
+      background: var(--inputbg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px;
+      border-radius: 10px;
+      width: 420px;
+      max-width: 90vw;
+    }
+    button {
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .pill {
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .pager a, .pager span {
+      display:inline-block;
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel2);
+      margin-right: 6px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .pager span {
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="row">
+    <h2 style="margin:0;">TSync</h2>
+    <span class="muted">Local Tenable asset cache</span>
+    <span style="flex:1;"></span>
+
+    <a href="/">Home</a>
+    <a href="/diff">Diff</a>
+    <a href="/tags">Tags</a>
+    <a href="/migration">Migration</a>
+    <a href="/settings">Settings</a>
+  </div>
+
+  {% block content %}{% endblock %}
+</body>
+</html>

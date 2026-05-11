@@ -1,0 +1,135 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="card">
+  <b>Settings</b>
+  <div class="muted" style="margin-top:6px;">
+    Keys are stored in <b>Windows Credential Manager</b> via <code>keyring</code> (not in your code, not in C:\TSync).
+  </div>
+</div>
+
+<!-- ===================== -->
+<!-- Tenable Settings Form -->
+<!-- ===================== -->
+<div class="card">
+  <div class="row">
+    <b>Tenable</b>
+    <span style="flex:1;"></span>
+    <span class="pill">Keys saved: <b>{{ "Yes" if has_keys else "No" }}</b></span>
+    {% if has_keys %}
+      <span class="pill">Access: {{ masked_access }}</span>
+      <span class="pill">Secret: {{ masked_secret }}</span>
+    {% endif %}
+  </div>
+
+  <form method="post" action="/settings/tenable" style="margin-top:12px;">
+    <div style="margin-top:12px; margin-bottom:10px;">
+      <label class="muted">Base URL</label><br/>
+      <input name="base_url" value="{{ base_url }}" />
+      <div class="muted">Usually <code>https://cloud.tenable.com</code></div>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <label class="muted">Access Key</label><br/>
+      <input name="access_key" placeholder="Paste Access Key" required />
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <label class="muted">Secret Key</label><br/>
+      <input name="secret_key" placeholder="Paste Secret Key" required />
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <button type="submit">Save Tenable</button>
+      <span style="flex:1;"></span>
+      <form method="post" action="/settings/clear">
+        <button type="submit">Clear Tenable keys</button>
+      </form>
+    </div>
+  </form>
+
+</div>
+
+<!-- ===================== -->
+<!-- JumpCloud Settings Form -->
+<!-- ===================== -->
+<div class="card">
+  <div class="row">
+    <b>JumpCloud</b>
+    <span style="flex:1;"></span>
+    <span class="pill">{{ jc1_label }} key saved: <b>{{ "Yes" if jc1_has_key else "No" }}</b></span>
+    <span class="pill">{{ jc2_label }} key saved: <b>{{ "Yes" if jc2_has_key else "No" }}</b></span>
+  </div>
+
+  <div class="muted" style="margin-top:6px;">
+    Add two JumpCloud accounts (API key + Org ID). Org ID is required for MSP/multi-tenant; for single-tenant it can still be entered.
+  </div>
+
+  <form method="post" action="/settings/jumpcloud" style="margin-top:12px;">
+
+    <div class="card" style="margin-top:0;">
+      <b>Account 1 — {{ jc1_label }}</b>
+      <div style="margin-top:10px;">
+        <span class="pill">Key saved: <b>{{ "Yes" if jc1_has_key else "No" }}</b></span>
+        {% if jc1_has_key %}
+          <span class="pill">Key: {{ jc1_masked_key }}</span>
+        {% endif %}
+        {% if jc1_org %}
+          <span class="pill">Org ID: {{ jc1_org }}</span>
+        {% endif %}
+      </div>
+
+      <div style="margin-top:12px; margin-bottom:10px;">
+        <label class="muted">Org ID ({{ jc1_label }})</label><br/>
+        <input name="jc1_org_id" value="{{ jc1_org }}" placeholder="Paste Org ID" />
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <label class="muted">API Key ({{ jc1_label }})</label><br/>
+        <input name="jc1_api_key" placeholder="Paste JumpCloud API Key" />
+      </div>
+    </div>
+
+    <div class="card">
+      <b>Account 2 — {{ jc2_label }}</b>
+      <div style="margin-top:10px;">
+        <span class="pill">Key saved: <b>{{ "Yes" if jc2_has_key else "No" }}</b></span>
+        {% if jc2_has_key %}
+          <span class="pill">Key: {{ jc2_masked_key }}</span>
+        {% endif %}
+        {% if jc2_org %}
+          <span class="pill">Org ID: {{ jc2_org }}</span>
+        {% endif %}
+      </div>
+
+      <div style="margin-top:12px; margin-bottom:10px;">
+        <label class="muted">Org ID ({{ jc2_label }})</label><br/>
+        <input name="jc2_org_id" value="{{ jc2_org }}" placeholder="Paste Org ID" />
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <label class="muted">API Key ({{ jc2_label }})</label><br/>
+        <input name="jc2_api_key" placeholder="Paste JumpCloud API Key" />
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <button type="submit">Save JumpCloud</button>
+      <span style="flex:1;"></span>
+      <form method="post" action="/settings/clear_jumpcloud">
+        <button type="submit">Clear JumpCloud keys</button>
+      </form>
+    </div>
+  </form>
+
+</div>
+
+<div class="card">
+  <b>Where data is stored</b>
+  <div class="muted" style="margin-top:6px;">
+    Tenable asset cache DB: <code>C:\TSync\tsync.db</code><br/>
+    JumpCloud systems cache DB: <code>C:\TSync\tsync.db</code> (table: <code>jumpcloud_systems</code>)
+  </div>
+</div>
+
+{% endblock %}

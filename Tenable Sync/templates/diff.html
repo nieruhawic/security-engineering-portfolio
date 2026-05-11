@@ -1,0 +1,611 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<style>
+  :root{
+    --panel: rgba(14, 14, 16, 0.92);
+    --panel2: rgba(18, 18, 20, 0.86);
+
+    --border: rgba(255,255,255,0.10);
+    --border2: rgba(255,255,255,0.07);
+
+    --text: rgba(255,255,255,0.92);
+    --muted: rgba(255,255,255,0.60);
+    --muted2: rgba(255,255,255,0.42);
+
+    --accent: #ff7a18;
+    --accentBright: #ff9b3a;
+    --accent2: rgba(255,122,24,0.22);
+
+    --danger: #ff3b3b;
+    --shadow: 0 14px 44px rgba(0,0,0,0.70);
+
+    --radius: 14px;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  }
+
+  /* ✅ Force black background ONLY on /diff page */
+  html, body {
+    background: #000 !important;
+  }
+  /* In case layout wraps content in a light container */
+  body > *, .container, .content, main {
+    background: transparent !important;
+  }
+
+  .diff-wrap{
+    max-width: 1380px;
+    margin: 0 auto;
+    padding: 16px 12px 52px;
+    font-family: var(--sans);
+    color: var(--text);
+  }
+
+  /* Hero */
+  .diff-hero{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    padding: 16px 18px;
+    border: 1px solid var(--border);
+    background:
+      radial-gradient(900px 240px at 20% 0%, rgba(255,122,24,0.18), rgba(0,0,0,0) 55%),
+      linear-gradient(180deg, rgba(12,12,14,0.96), rgba(10,10,12,0.88));
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+  .diff-hero h1{
+    font-size: 18px;
+    margin: 0;
+    letter-spacing: 0.3px;
+    color: var(--accentBright);
+  }
+  .diff-hero .sub{
+    margin-top: 6px;
+    color: rgba(255,255,255,0.72);
+    font-size: 12.5px;
+    line-height: 1.35;
+  }
+  .diff-hero .sub b{
+    color: var(--accentBright);
+    font-weight: 700;
+  }
+  .diff-hero .meta{
+    margin-top: 8px;
+    color: var(--muted2);
+    font-size: 12px;
+  }
+  .diff-hero .meta b{ color: var(--accentBright); font-weight: 750; }
+
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding: 6px 10px;
+    border: 1px solid rgba(255,122,24,0.22);
+    background: rgba(255,122,24,0.08);
+    border-radius: 999px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.78);
+    white-space: nowrap;
+  }
+  .badge b{ color: var(--accentBright); font-weight: 750; }
+
+  /* Panels */
+  .panel{
+    border: 1px solid var(--border);
+    background: var(--panel);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin: 14px 0;
+    overflow: hidden;
+  }
+
+  .panel-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 14px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border2);
+    background:
+      linear-gradient(180deg, rgba(255,122,24,0.06), rgba(0,0,0,0)),
+      linear-gradient(180deg, rgba(18,18,20,0.90), rgba(14,14,16,0.70));
+  }
+  .panel-title{
+    display:flex;
+    flex-direction:column;
+    gap: 6px;
+  }
+  .panel-title .kicker{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size: 13px;
+    font-weight: 850;
+    letter-spacing: 0.3px;
+    color: var(--accentBright);
+  }
+  .dot{
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px rgba(255,122,24,0.18);
+  }
+  .panel-title .desc{
+    font-size: 12px;
+    color: rgba(255,255,255,0.70);
+  }
+  .panel-title .desc b{
+    color: var(--accentBright);
+    font-weight: 800;
+  }
+
+  .panel-actions{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content:flex-end;
+  }
+
+  /* Buttons + selects */
+  .btn{
+    appearance:none;
+    border: 1px solid rgba(255,122,24,0.22);
+    background: rgba(0,0,0,0.45);
+    color: rgba(255,255,255,0.90);
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: transform .05s ease, border-color .12s ease, background .12s ease, color .12s ease;
+    user-select:none;
+  }
+  .btn:hover{
+    border-color: rgba(255,122,24,0.62);
+    background: rgba(255,122,24,0.14);
+    color: var(--accentBright);
+  }
+  .btn:active{ transform: translateY(1px); }
+
+  .btn-danger{
+    border-color: rgba(255,59,59,0.35);
+  }
+  .btn-danger:hover{
+    border-color: rgba(255,59,59,0.75);
+    background: rgba(255,59,59,0.14);
+    color: rgba(255,255,255,0.94);
+  }
+
+  .btn-ghost{
+    border-color: rgba(255,255,255,0.10);
+    background: rgba(0,0,0,0.28);
+  }
+  .btn-ghost:hover{
+    border-color: rgba(255,122,24,0.55);
+    background: rgba(255,122,24,0.12);
+    color: var(--accentBright);
+  }
+
+  .select{
+    border: 1px solid rgba(255,122,24,0.22);
+    background: rgba(0,0,0,0.50);
+    color: rgba(255,255,255,0.92);
+    border-radius: 10px;
+    padding: 7px 10px;
+    font-size: 12.5px;
+  }
+
+  /* Status line */
+  .status{
+    padding: 10px 16px 12px;
+    color: rgba(255,255,255,0.74);
+    font-size: 12px;
+    border-bottom: 1px solid var(--border2);
+    background: rgba(0,0,0,0.30);
+  }
+
+  /* Tables */
+  .table-wrap{ overflow: auto; }
+  table{
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1120px;
+    font-size: 12.5px;
+  }
+  thead th{
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    text-align: left;
+    padding: 10px 10px;
+    color: rgba(255,155,58,0.95);
+    background: rgba(4,4,6,0.98);
+    border-bottom: 1px solid rgba(255,122,24,0.24);
+    font-weight: 850;
+    letter-spacing: 0.28px;
+  }
+  tbody td{
+    padding: 9px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    vertical-align: middle;
+    color: rgba(255,255,255,0.90);
+  }
+  tbody tr:nth-child(even){
+    background: rgba(255,122,24,0.03);
+  }
+  tbody tr:hover{
+    background: rgba(255,122,24,0.11);
+  }
+
+  .muted{ color: rgba(255,255,255,0.66); }
+  .muted2{ color: rgba(255,255,255,0.45); }
+
+  code{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: rgba(255,200,140,0.92);
+    background: rgba(0,0,0,0.45);
+    border: 1px solid rgba(255,122,24,0.22);
+    padding: 2px 6px;
+    border-radius: 8px;
+  }
+
+  /* Checkbox sizing */
+  .tsync-checkbox {
+    width: 12px;
+    height: 12px;
+    transform: scale(0.85);
+    transform-origin: center;
+    vertical-align: middle;
+    accent-color: var(--accentBright);
+  }
+  .chk-col { width: 34px; }
+
+  /* Pager */
+  .pager{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .pager a, .pager span{
+    display:inline-flex;
+    align-items:center;
+    padding: 7px 9px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,122,24,0.22);
+    font-size: 12px;
+    text-decoration: none;
+    background: rgba(0,0,0,0.50);
+    color: rgba(255,255,255,0.74);
+  }
+  .pager a:hover{
+    border-color: rgba(255,122,24,0.68);
+    background: rgba(255,122,24,0.14);
+    color: var(--accentBright);
+  }
+  .pager span{
+    opacity: 0.48;
+    border-color: rgba(255,255,255,0.10);
+  }
+
+  .inline{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+</style>
+
+<div class="diff-wrap">
+
+  <div class="diff-hero">
+    <div>
+      <h1>TSync — Tenable ↔ JumpCloud Diff</h1>
+      <div class="sub">
+        Matching uses multiple Tenable name fields + <b>15-char variants</b> (case-insensitive) to reduce false gaps.
+        Deletes will <b>unlink</b> (if needed) then <b>hard delete</b>.
+      </div>
+      <div class="meta">
+        Tenable cached: <b>{{ tenable_total }}</b> • JumpCloud cached: <b>{{ jc_total }}</b>
+        • {{ jc1_label }}: <b>{{ jc1_total }}</b> • {{ jc2_label }}: <b>{{ jc2_total }}</b>
+      </div>
+    </div>
+
+    <div class="inline">
+      <span class="badge">Tenable <b>{{ tenable_total }}</b></span>
+      <span class="badge">JumpCloud <b>{{ jc_total }}</b></span>
+    </div>
+  </div>
+
+  <!-- Section 1 -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title">
+        <div class="kicker"><span class="dot"></span>Section 1 — Tenable devices not found in JumpCloud</div>
+        <div class="desc">Tenable-only: <b>{{ gap_total }}</b> • Sorted by oldest Last Seen first</div>
+      </div>
+
+      <div class="panel-actions">
+        <span class="badge">Page <b>{{ page }}</b> / <b>{{ gap_total_pages }}</b></span>
+        <span class="muted2">Show</span>
+        <select id="perPageSel" class="select">
+          {% for n in [10,50,100,200,500] %}
+            <option value="{{ n }}" {% if n == per_page %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+        <span class="muted2">rows</span>
+
+        <button id="gapSelectAllBtn" type="button" class="btn btn-ghost">Select all</button>
+        <button id="gapClearBtn" type="button" class="btn btn-ghost">Clear</button>
+        <button id="gapDeleteBtn" type="button" class="btn btn-danger">Delete selected</button>
+
+        <div class="pager">
+          {% if page > 1 %}
+            <a href="/diff?page=1&per_page={{ per_page }}&tag_page={{ tag_page }}&tag_per_page={{ tag_per_page }}&jc_only_page={{ jc_only_page }}&jc_only_per_page={{ jc_only_per_page }}">First</a>
+            <a href="/diff?page={{ page-1 }}&per_page={{ per_page }}&tag_page={{ tag_page }}&tag_per_page={{ tag_per_page }}&jc_only_page={{ jc_only_page }}&jc_only_per_page={{ jc_only_per_page }}">Prev</a>
+          {% else %}
+            <span>First</span><span>Prev</span>
+          {% endif %}
+          {% if page < gap_total_pages %}
+            <a href="/diff?page={{ page+1 }}&per_page={{ per_page }}&tag_page={{ tag_page }}&tag_per_page={{ tag_per_page }}&jc_only_page={{ jc_only_page }}&jc_only_per_page={{ jc_only_per_page }}">Next</a>
+            <a href="/diff?page={{ gap_total_pages }}&per_page={{ per_page }}&tag_page={{ tag_page }}&tag_per_page={{ tag_per_page }}&jc_only_page={{ jc_only_page }}&jc_only_per_page={{ jc_only_per_page }}">Last</a>
+          {% else %}
+            <span>Next</span><span>Last</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div id="gapStatus" class="status">Ready.</div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="chk-col"></th>
+            <th style="width: 290px;">Tenable ID</th>
+            <th>Hostname</th>
+            <th style="width: 140px;">Match key</th>
+            <th style="width: 220px;">Possible JC match</th>
+            <th style="width: 260px;">Tenable name candidates</th>
+            <th>OS</th>
+            <th style="width: 220px;">Last Seen</th>
+            <th>Tags</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in gaps %}
+          <tr>
+            <td class="chk-col"><input class="gapChk tsync-checkbox" type="checkbox" value="{{ a.id }}" /></td>
+            <td><code>{{ a.id }}</code></td>
+            <td style="color: rgba(255,255,255,0.94);">{{ a.hostname }}</td>
+            <td class="muted"><code>{{ a._match_key }}</code></td>
+            <td class="muted">{{ a._possible_jc }}</td>
+            <td class="muted">
+              {% if a._tenable_candidates %}
+                {{ a._tenable_candidates | join(", ") }}
+              {% endif %}
+            </td>
+            <td class="muted">{{ a.os }}</td>
+            <td style="color: var(--accentBright); font-family: var(--mono);">{{ a.last_seen }}</td>
+            <td class="muted">{{ a.tags }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 2 -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title">
+        <div class="kicker"><span class="dot"></span>Section 2 — Tenable devices tagged: <code>{{ tag_label }}</code></div>
+        <div class="desc">Tagged assets: <b>{{ tag_total }}</b> • Sorted by oldest Last Seen first</div>
+      </div>
+
+      <div class="panel-actions">
+        <span class="badge">Page <b>{{ tag_page }}</b> / <b>{{ tag_total_pages }}</b></span>
+        <span class="muted2">Show</span>
+        <select id="tagPerPageSel" class="select">
+          {% for n in [10,50,100,200,500] %}
+            <option value="{{ n }}" {% if n == tag_per_page %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+        <span class="muted2">rows</span>
+
+        <button id="tagSelectAllBtn" type="button" class="btn btn-ghost">Select all</button>
+        <button id="tagClearBtn" type="button" class="btn btn-ghost">Clear</button>
+        <button id="tagDeleteBtn" type="button" class="btn btn-danger">Delete selected</button>
+
+        <div class="pager">
+          {% if tag_page > 1 %}
+            <a href="/diff?page={{ page }}&per_page={{ per_page }}&tag_page=1&tag_per_page={{ tag_per_page }}&jc_only_page={{ jc_only_page }}&jc_only_per_page={{ jc_only_per_page }}">First</a>
+            <a href="/diff?page={{ page }}&per_page={{ per_page }}&tag_page={{ tag_page-1 }}&tag_per_page={{ tag_per_page }}&jc_only_page={{ jc_only_page }}&jc_only_per_page={{ jc_only_per_page }}">Prev</a>
+          {% else %}
+            <span>First</span><span>Prev</span>
+          {% endif %}
+          {% if tag_page < tag_total_pages %}
+            <a href="/diff?page={{ page }}&per_page={{ per_page }}&tag_page={{ tag_page+1 }}&tag_per_page={{ tag_per_page }}&jc_only_page={{ jc_only_page }}&jc_only_per_page={{ jc_only_per_page }}">Next</a>
+            <a href="/diff?page={{ page }}&per_page={{ per_page }}&tag_page={{ tag_total_pages }}&tag_per_page={{ tag_per_page }}&jc_only_page={{ jc_only_page }}&jc_only_per_page={{ jc_only_per_page }}">Last</a>
+          {% else %}
+            <span>Next</span><span>Last</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div id="tagStatus" class="status">Ready.</div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="chk-col"></th>
+            <th style="width: 290px;">Tenable ID</th>
+            <th>Hostname</th>
+            <th>OS</th>
+            <th style="width: 220px;">Last Seen</th>
+            <th>Tags</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in tagged %}
+          <tr>
+            <td class="chk-col"><input class="tagChk tsync-checkbox" type="checkbox" value="{{ a.id }}" /></td>
+            <td><code>{{ a.id }}</code></td>
+            <td style="color: rgba(255,255,255,0.94);">{{ a.hostname }}</td>
+            <td class="muted">{{ a.os }}</td>
+            <td style="color: var(--accentBright); font-family: var(--mono);">{{ a.last_seen }}</td>
+            <td class="muted">{{ a.tags }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 3 -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title">
+        <div class="kicker"><span class="dot"></span>Section 3 — JumpCloud devices not found in Tenable</div>
+        <div class="desc">JumpCloud-only: <b>{{ jc_only_total }}</b> • Read-only list</div>
+      </div>
+
+      <div class="panel-actions">
+        <span class="badge">Page <b>{{ jc_only_page }}</b> / <b>{{ jc_only_total_pages }}</b></span>
+        <span class="muted2">Show</span>
+        <select id="jcOnlyPerPageSel" class="select">
+          {% for n in [10,50,100,200,500] %}
+            <option value="{{ n }}" {% if n == jc_only_per_page %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+        <span class="muted2">rows</span>
+
+        <div class="pager">
+          {% if jc_only_page > 1 %}
+            <a href="/diff?jc_only_page=1&jc_only_per_page={{ jc_only_per_page }}&page={{ page }}&per_page={{ per_page }}&tag_page={{ tag_page }}&tag_per_page={{ tag_per_page }}">First</a>
+            <a href="/diff?jc_only_page={{ jc_only_page-1 }}&jc_only_per_page={{ jc_only_per_page }}&page={{ page }}&per_page={{ per_page }}&tag_page={{ tag_page }}&tag_per_page={{ tag_per_page }}">Prev</a>
+          {% else %}
+            <span>First</span><span>Prev</span>
+          {% endif %}
+          {% if jc_only_page < jc_only_total_pages %}
+            <a href="/diff?jc_only_page={{ jc_only_page+1 }}&jc_only_per_page={{ jc_only_per_page }}&page={{ page }}&per_page={{ per_page }}&tag_page={{ tag_page }}&tag_per_page={{ tag_per_page }}">Next</a>
+            <a href="/diff?jc_only_page={{ jc_only_total_pages }}&jc_only_per_page={{ jc_only_per_page }}&page={{ page }}&per_page={{ per_page }}&tag_page={{ tag_page }}&tag_per_page={{ tag_per_page }}">Last</a>
+          {% else %}
+            <span>Next</span><span>Last</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="status">Read-only list (no actions).</div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:140px;">Account</th>
+            <th style="width: 240px;">JC ID</th>
+            <th>Hostname</th>
+            <th>OS</th>
+            <th style="width: 220px;">Last Seen</th>
+            <th>Tags</th>
+            <th style="width: 140px;">Match key</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in jc_only %}
+          <tr>
+            <td><code>{{ s._label }}</code></td>
+            <td><code>{{ s.id }}</code></td>
+            <td style="color: rgba(255,255,255,0.94);">{{ s.hostname }}</td>
+            <td class="muted">{{ s.os }}</td>
+            <td style="color: var(--accentBright); font-family: var(--mono);">{{ s.last_seen }}</td>
+            <td class="muted">{{ s.tags }}</td>
+            <td class="muted"><code>{{ s._match_key }}</code></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const perSel = document.getElementById("perPageSel");
+  perSel.addEventListener("change", () => {
+    const per = perSel.value;
+    window.location.href = `/diff?page=1&per_page=${per}&tag_page={{ tag_page }}&tag_per_page={{ tag_per_page }}&jc_only_page={{ jc_only_page }}&jc_only_per_page={{ jc_only_per_page }}`;
+  });
+
+  const tagPerSel = document.getElementById("tagPerPageSel");
+  tagPerSel.addEventListener("change", () => {
+    const per = tagPerSel.value;
+    window.location.href = `/diff?page={{ page }}&per_page={{ per_page }}&tag_page=1&tag_per_page=${per}&jc_only_page={{ jc_only_page }}&jc_only_per_page={{ jc_only_per_page }}`;
+  });
+
+  const jcOnlyPerSel = document.getElementById("jcOnlyPerPageSel");
+  jcOnlyPerSel.addEventListener("change", () => {
+    const per = jcOnlyPerSel.value;
+    window.location.href = `/diff?page={{ page }}&per_page={{ per_page }}&tag_page={{ tag_page }}&tag_per_page={{ tag_per_page }}&jc_only_page=1&jc_only_per_page=${per}`;
+  });
+
+  function qsa(sel){ return Array.from(document.querySelectorAll(sel)); }
+  function setAll(sel, checked){ qsa(sel).forEach(x => x.checked = checked); }
+  function getCheckedValues(sel){ return qsa(sel).filter(x => x.checked).map(x => x.value); }
+
+  async function deleteSelected(values, statusEl){
+    if (!values.length){
+      statusEl.textContent = "No devices selected.";
+      return;
+    }
+    const ok = confirm(`This will UNLINK then HARD DELETE ${values.length} assets from Tenable. Continue?`);
+    if (!ok) return;
+
+    statusEl.textContent = `Submitting ${values.length} delete requests...`;
+
+    const form = new FormData();
+    values.forEach(v => form.append("asset_uuids", v));
+
+    try {
+      const res = await fetch("/api/tenable/delete-assets", { method: "POST", body: form });
+      const data = await res.json();
+
+      if (!data.ok){
+        statusEl.textContent = "Delete failed: " + (data.error || "unknown error");
+        return;
+      }
+
+      statusEl.textContent =
+        `Done. selected=${data.selected}, unlinked=${data.unlinked}, already_unlinked=${data.already_unlinked}, ` +
+        `delete_jobs_submitted=${data.delete_jobs_submitted}, errors=${data.errors}.`;
+    } catch (e) {
+      statusEl.textContent = "Delete failed: " + e;
+    }
+  }
+
+  const gapStatus = document.getElementById("gapStatus");
+  document.getElementById("gapSelectAllBtn").addEventListener("click", () => setAll(".gapChk", true));
+  document.getElementById("gapClearBtn").addEventListener("click", () => setAll(".gapChk", false));
+  document.getElementById("gapDeleteBtn").addEventListener("click", () => {
+    deleteSelected(getCheckedValues(".gapChk"), gapStatus);
+  });
+
+  const tagStatus = document.getElementById("tagStatus");
+  document.getElementById("tagSelectAllBtn").addEventListener("click", () => setAll(".tagChk", true));
+  document.getElementById("tagClearBtn").addEventListener("click", () => setAll(".tagChk", false));
+  document.getElementById("tagDeleteBtn").addEventListener("click", () => {
+    deleteSelected(getCheckedValues(".tagChk"), tagStatus);
+  });
+</script>
+
+{% endblock %}
