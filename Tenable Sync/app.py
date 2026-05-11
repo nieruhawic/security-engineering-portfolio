@@ -35,13 +35,13 @@ JC2_ORGID = "jc2_org_id"
 JC_BASE_URL = "https://console.jumpcloud.com"
 
 # Friendly labels (requested)
-JC1_LABEL = "Beyond"
-JC2_LABEL = "FiveLakes"
+JC1_LABEL = "Account1"
+JC2_LABEL = "Account2"
 
 # Tenable tag constants (NEW)
 ORG_TAG_CATEGORY = "Org"
-ORG_TAG_BEYOND_VALUE = "Beyond"
-ORG_TAG_FIVELAKES_VALUE = "FiveLakes"
+ORG_TAG_ACCOUNT1_VALUE = "Account1"
+ORG_TAG_ACCOUNT2_VALUE = "Account2"
 
 # ----------------------------
 # App
@@ -1089,23 +1089,23 @@ def api_tenable_tag_org():
 
     try:
         # Build match-key sets from JC caches
-        beyond_keys: set = set()
-        fivelakes_keys: set = set()
+        acct1_keys: set = set()
+        acct2_keys: set = set()
 
         for s in jc_get_all_raw(1):
             k = hostname_key15(jc_extract_hostname(s))
             if k:
-                beyond_keys.add(k)
+                acct1_keys.add(k)
 
         for s in jc_get_all_raw(2):
             k = hostname_key15(jc_extract_hostname(s))
             if k:
-                fivelakes_keys.add(k)
+                acct2_keys.add(k)
 
         tenable_assets = get_all_assets_raw()
 
-        beyond_assets: List[str] = []
-        fivelakes_assets: List[str] = []
+        acct1_assets: List[str] = []
+        acct2_assets: List[str] = []
         both_assets: List[str] = []
         collisions = 0
         no_match = 0
@@ -1122,22 +1122,22 @@ def api_tenable_tag_org():
                 continue
 
             k = hostname_key15(hn)
-            in_b = k in beyond_keys
-            in_f = k in fivelakes_keys
+            in_b = k in acct1_keys
+            in_f = k in acct2_keys
 
             if in_b and in_f:
                 collisions += 1
                 both_assets.append(asset_uuid)
             elif in_b:
-                beyond_assets.append(asset_uuid)
+                acct1_assets.append(asset_uuid)
             elif in_f:
-                fivelakes_assets.append(asset_uuid)
+                acct2_assets.append(asset_uuid)
             else:
                 no_match += 1
 
         # Ensure tag values exist in Tenable
-        beyond_tag_uuid    = tenable_find_or_create_tag_value_uuid(access, secret, base_url, ORG_TAG_CATEGORY, ORG_TAG_BEYOND_VALUE)
-        fivelakes_tag_uuid = tenable_find_or_create_tag_value_uuid(access, secret, base_url, ORG_TAG_CATEGORY, ORG_TAG_FIVELAKES_VALUE)
+        acct1_tag_uuid    = tenable_find_or_create_tag_value_uuid(access, secret, base_url, ORG_TAG_CATEGORY, ORG_TAG_ACCOUNT1_VALUE)
+        acct2_tag_uuid = tenable_find_or_create_tag_value_uuid(access, secret, base_url, ORG_TAG_CATEGORY, ORG_TAG_ACCOUNT2_VALUE)
         both_tag_uuid      = tenable_find_or_create_tag_value_uuid(access, secret, base_url, ORG_TAG_CATEGORY, "Both Accounts")
 
         # Batch assignments
@@ -1145,19 +1145,19 @@ def api_tenable_tag_org():
             return [lst[i:i+size] for i in range(0, len(lst), size)]
 
         batch_size = 1000
-        jobs_beyond: List[str] = []
-        jobs_fivelakes: List[str] = []
+        jobs_acct1: List[str] = []
+        jobs_acct2: List[str] = []
         jobs_both: List[str] = []
 
-        for b in batches(beyond_assets, batch_size):
-            job = tenable_assign_tags_to_assets(access, secret, base_url, b, [beyond_tag_uuid], action="add")
+        for b in batches(acct1_assets, batch_size):
+            job = tenable_assign_tags_to_assets(access, secret, base_url, b, [acct1_tag_uuid], action="add")
             if job:
-                jobs_beyond.append(job)
+                jobs_acct1.append(job)
 
-        for f in batches(fivelakes_assets, batch_size):
-            job = tenable_assign_tags_to_assets(access, secret, base_url, f, [fivelakes_tag_uuid], action="add")
+        for f in batches(acct2_assets, batch_size):
+            job = tenable_assign_tags_to_assets(access, secret, base_url, f, [acct2_tag_uuid], action="add")
             if job:
-                jobs_fivelakes.append(job)
+                jobs_acct2.append(job)
 
         for bt in batches(both_assets, batch_size):
             job = tenable_assign_tags_to_assets(access, secret, base_url, bt, [both_tag_uuid], action="add")
@@ -1166,17 +1166,17 @@ def api_tenable_tag_org():
 
         return JSONResponse({
             "ok": True,
-            "jc_counts": {"Beyond": jc1_total, "FiveLakes": jc2_total},
+            "jc_counts": {"Account1": jc1_total, "Account2": jc2_total},
             "tenable_assets_total": len(tenable_assets),
             "match_counts": {
-                "beyond_assets_to_tag": len(beyond_assets),
-                "fivelakes_assets_to_tag": len(fivelakes_assets),
+                "acct1_assets_to_tag": len(acct1_assets),
+                "acct2_assets_to_tag": len(acct2_assets),
                 "both_accounts_tagged": len(both_assets),
                 "no_match": int(no_match),
                 "missing_hostname": int(missing_hostname),
             },
-            "tag_uuids": {"Org:Beyond": beyond_tag_uuid, "Org:FiveLakes": fivelakes_tag_uuid, "Org:Both Accounts": both_tag_uuid},
-            "jobs": {"Beyond": jobs_beyond, "FiveLakes": jobs_fivelakes, "Both Accounts": jobs_both},
+            "tag_uuids": {[0m"Org:Account1": acct1_tag_uuid, "Org:Account2": acct2_tag_uuid, "Org:Both Accounts": both_tag_uuid},
+            "jobs": {"Account1": jobs_acct1, "Account2": jobs_acct2, "Both Accounts": jobs_both},
             "note": "Tags applied via Tenable async jobs. 'Both Accounts' devices appear in both JC orgs — likely mid-migration. Review and re-tag once migration is complete."
         })
 
